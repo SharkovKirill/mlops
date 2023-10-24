@@ -15,7 +15,13 @@ catboost = "^1.2.2"
 black = "^23.10.0"
 isort = "^5.12.0"
 flake8 = "^6.1.0"
+fastapi = "^0.104.0"
+uvicorn = "^0.23.2"
+gunicorn = "^21.2.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+start = "mlops_hse.main:start"
