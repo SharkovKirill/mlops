@@ -1,21 +1,21 @@
+from typing import Dict, List
+
+import numpy as np
 from catboost import CatBoostClassifier
 from sklearn.ensemble import RandomForestClassifier
-import pandas as pd
-from typing import Dict, List
-import numpy as np
 
 
-class MyKeyError(KeyError):
+class NameKeyError(KeyError):
     def __init__(self, text):
         self.txt = text
 
 
-class MyAlreadyExitsError(Exception):
+class MyAlreadyExistsError(Exception):
     def __init__(self, text):
         self.txt = text
 
 
-class MyTypeError(KeyError):
+class ParamsTypeError(TypeError):
     def __init__(self, text):
         self.txt = text
 
@@ -26,6 +26,11 @@ class InvalidData(Exception):
 
 
 class AllModels(object):
+    """
+    Class for working with models
+
+    """
+
     def __new__(cls):
         if not hasattr(cls, "instance"):
             cls.instance = super(AllModels, cls).__new__(cls)
@@ -39,7 +44,21 @@ class AllModels(object):
         self.__models: Dict[Model] = {}
         self.__names_fitted_models: List[str] = []
 
-    def get_avaliable_model_types(self, show=False):
+    def get_available_model_types(self, show=False):
+        """
+        Getting available model types
+
+        Parameters
+        ----------
+        show : bool, optional
+            True for representation, else False, by default False
+
+        Returns
+        -------
+        Dict
+            If show==True return dict for representaion, else return dict
+            with available model classes
+        """
         if show:
             return [
                 {"model_name": key, "model_type": str(value)}
@@ -51,22 +70,44 @@ class AllModels(object):
     def get_models(
         self, only_fitted: bool = False, name_models: str | None = None
     ):
+        """
+        Getting all user models
+
+        Parameters
+        ----------
+        only_fitted : bool, optional
+            True if you want to get only fitted model(s), else False,
+            by default False
+        name_models : str | None, optional
+            User's model name of only ONE particular model you want to get,
+            by default None
+
+        Returns
+        -------
+        Dict
+            Dictionary with user model name, type of model, params dict,
+            fitting bool inidactor
+
+        Raises
+        ------
+        NameKeyError
+            Occurs if the model with the same name was not found
+            or was not fitted
+        """
         if name_models is not None and only_fitted:
             if name_models in self.__names_fitted_models:
                 name_models = [name_models]
             else:
-                raise MyKeyError(
-                    "Модель с таким именем не найдена или не обучена"
+                raise NameKeyError(
+                    "A model with the same name was not found or was not fitted"
                 )
         elif name_models is not None:
             if name_models in list(self.__models.keys()):
                 name_models = [name_models]
             else:
-                raise MyKeyError("Модель с таким именем не найдена")
+                raise NameKeyError("There is no model with this name")
         else:
-            print("cr not name models")
             if only_fitted:
-                print("зашло")
                 name_models = self.__names_fitted_models
             else:
                 name_models = list(self.__models.keys())
@@ -81,12 +122,42 @@ class AllModels(object):
         ]
 
     def init_new_model(
-        self, type_model: str, user_model_name: str, params: Dict = {}
+        self, type_model: str, user_model_name: str, params: dict = {}
     ):
+        """
+        Initialize one model and store it in memory
+
+        Parameters
+        ----------
+        type_model : str
+            Shortname of base model type
+        user_model_name : str
+            User's model name
+        params : dict, optional
+            User's params for model, by default {}
+
+        Returns
+        -------
+        Dict
+            Dictionary with user model name, type of model, params dict,
+            fitting bool inidactor
+
+        Raises
+        ------
+        MyAlreadyExistsError
+            Occurs if a model with same name already exists
+
+        NameKeyError
+            Occurs if there is an error in model type or model name
+        """
         if user_model_name in self.__models.keys():
-            raise MyAlreadyExitsError("Модель с таким именем уже существует")
+            raise MyAlreadyExistsError(
+                "A model with the same name already exists"
+            )
         if type_model not in self.__available_model_types.keys():
-            raise MyKeyError("Выбранной модели нет в списке доступных")
+            raise NameKeyError(
+                "The selected model is not in the list of available ones"
+            )
         self.__models[user_model_name] = Model(
             self.__available_model_types[type_model],
             type_model,
@@ -101,88 +172,207 @@ class AllModels(object):
         }
 
     def model_fit(self, X: np.array, y: np.array, user_model_name: str):
+        """
+        Model fitting
+
+        Parameters
+        ----------
+        X : np.array
+            Training data
+        y : np.array
+            Target data
+        user_model_name : str
+            Name of the model to be fitted
+
+        Raises
+        ------
+        NameKeyError
+            Occurs if a model with the same name was not found
+        """
         try:
             self.__models[user_model_name].fit(X, y)
             self.__names_fitted_models.append(user_model_name)
             self.fitted = True
         except KeyError:
-            raise MyKeyError("Модель с таким имененем не найдена")
+            raise NameKeyError("There is no model with this name")
 
-    def model_predict(self, X: np.array, user_model_name):
+    def model_predict(self, X: np.array, user_model_name: str):
+        """
+        Making prediction on data
+
+        Parameters
+        ----------
+        X : np.array
+            Data to predict on
+        user_model_name : str
+            Name of the model to use for prediction
+
+        Returns
+        -------
+        np.array
+            Predictions
+
+        Raises
+        ------
+        NameKeyError
+            Occurs if a model with the same name was not found
+            or was not fitted
+        """
         if user_model_name in self.__names_fitted_models:
             return self.__models[user_model_name].predict(X)
         else:
-            raise MyKeyError(
-                "Модель с таким имененем не найдена или не обучена"
+            raise NameKeyError(
+                "A model with the same name was not found or was not fitted"
             )
 
-    def get_params(self, user_model_name, all: bool = False):
+    def get_params(self, user_model_name: str, all: bool = False) -> dict:
+        """
+        Getting params of model by name
+
+        Parameters
+        ----------
+        user_model_name : str
+            User model name
+        all : bool, optional
+            True if you want to get all params, False if you want to get
+            params setted by user, by default False
+
+        Returns
+        -------
+        dict
+            Dict with params
+        """
         return self.__models[user_model_name].get_params(all)
 
     def delete_model(self, user_model_name: str):
+        """
+        Deleting model by name
+
+        Parameters
+        ----------
+        user_model_name : str
+            Model name to delete
+
+        Raises
+        ------
+        NameKeyError
+            Occurs if there is no model with same name
+        """
         try:
             del self.__models[user_model_name]
             if user_model_name in self.__names_fitted_models:
                 self.__names_fitted_models.remove(user_model_name)
         except KeyError:
-            raise MyKeyError("Модели с таким названием не существует")
+            raise NameKeyError("There is no model with this name")
 
 
 class Model:
+    """
+    Class describing one model
+
+    Raises
+    ------
+    ParamsTypeError
+        Error im params
+    InvalidData
+        Error in data
+    """
+
     getting_params_func_names = {
         CatBoostClassifier: CatBoostClassifier.get_all_params,
         RandomForestClassifier: RandomForestClassifier.get_params,
     }
 
     def __init__(
-        self, base_model, type_model, user_model_name: str, params
+        self, base_model, type_model: str, user_model_name: str, params: Dict
     ) -> None:
+        """
+        Constructs all the necessary attributes for the Model object.
+
+        Parameters
+        ----------
+        base_model : _type_
+            Base model class
+        type_model : str
+            Shortname for base model
+        user_model_name : str
+            User-specified model name
+        params : Dict
+            Params for model
+
+        Raises
+        ------
+        ParamsTypeError
+            Error in params
+        """
         self.type_model: str = type_model
         self.params: Dict = params
         self.user_model_name: str = user_model_name
         self.fiited: bool = False
-        print(params)
         try:
             self.base_model = base_model(**self.params)
         except TypeError:
-            raise MyTypeError("Переданы неправильные гиперпараметры модели")
+            raise ParamsTypeError("Incorrect model hyperparameters passed")
 
     def fit(self, X: np.array, y: np.array):
+        """
+        Fit one model
+
+        Parameters
+        ----------
+        X : np.array
+            Train data
+        y : np.array
+            Target data
+
+        Raises
+        ------
+        InvalidData
+            Error in data
+        """
         try:
             self.base_model.fit(X=X, y=y)
             self.fiited = True
         except:
-            raise InvalidData("Некорректные данные для обучения")
+            raise InvalidData("Incorrect training data")
 
     def predict(self, X: np.array):
+        """
+        Return prediction on X
+
+        Parameters
+        ----------
+        X : np.array
+            Data to predict on
+
+        Raises
+        ------
+        InvalidData
+            Error in data
+        """
         try:
             return self.base_model.predict(X)
         except:
-            raise InvalidData("Некорректные данные для предсказания")
+            raise InvalidData("Incorrect data for prediction")
 
-    def get_params(self, all):
+    def get_params(self, all: bool = False) -> dict:
+        """
+        Getting params of model
+
+        Parameters
+        ----------
+        all : bool, optional
+            True if you want to get all params, False if you want to get
+            params setted by user, by default False
+
+        Returns
+        -------
+        dict
+            Params dict
+        """
         if all is True:
             return self.getting_params_func_names[type(self.base_model)](
                 self.base_model
             )
         elif all is False:
             return self.params
-
-
-df = pd.DataFrame({"col1": [1, 2, 4], "col2": [1, 2, 4], "target": [4, 5, 6]})
-print(df)
-
-allm = AllModels()
-
-
-print(allm.get_avaliable_model_types())
-print(allm.get_models())
-
-allm.init_new_model("cb", "cb1", {"n_estimators": 131, "random_state": 42})
-allm.init_new_model("rf", "rf1", {"n_estimators": 132, "random_state": 42})
-allm.model_fit(X=df[["col1", "col2"]], y=df["target"], user_model_name="cb1")
-allm.model_fit(X=df[["col1", "col2"]], y=df["target"], user_model_name="rf1")
-print(allm.model_predict(pd.Series([4, 5, 6]), "cb1"))
-print(allm.get_models())
-print(allm.get_params("cb1"))
-print(allm.get_params("rf1"))
