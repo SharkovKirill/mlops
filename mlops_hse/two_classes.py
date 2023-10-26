@@ -44,7 +44,7 @@ class AllModels(object):
         self.__models: Dict[Model] = {}
         self.__names_fitted_models: List[str] = []
 
-    def get_available_model_types(self, show=False):
+    def get_available_model_types(self, show: bool = False):
         """
         Getting available model types
 
