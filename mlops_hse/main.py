@@ -46,9 +46,11 @@ async def getting_available_model_types() -> List[ModelTypes]:
 
 @app.get("/get_models", status_code=200)
 async def getting_models(
-    only_fitted: bool | None = False, name_model: str | None = None
+    only_fitted: bool | None = False,
+    all_params: bool | None = False,
+    name_model: str | None = None,
 ) -> List[Model]:
-    return allmodels.get_models(only_fitted, name_model)
+    return allmodels.get_models(only_fitted, all_params, name_model)
 
 
 @app.post("/init_new_model", status_code=201)

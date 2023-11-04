@@ -3,6 +3,9 @@ from typing import Dict, List
 import numpy as np
 from catboost import CatBoostClassifier
 from sklearn.ensemble import RandomForestClassifier
+import os
+
+import joblib
 
 
 class NameKeyError(KeyError):
@@ -41,8 +44,27 @@ class AllModels(object):
             "cb": CatBoostClassifier,
             "rf": RandomForestClassifier,
         }
-        self.__models: Dict[Model] = {}
         self.__names_fitted_models: List[str] = []
+        self.__models: Dict[Model] = {}
+
+        self.PATH = os.getcwd()
+        self.PATH_MODELS = os.path.join(self.PATH, "models")
+
+        if not os.path.isdir(self.PATH_MODELS):
+            os.mkdir(self.PATH_MODELS)
+
+        if len(os.listdir(self.PATH_MODELS)) != 0:
+            for model_name in os.listdir(self.PATH_MODELS):
+                loaded_model = joblib.load(
+                    os.path.join(self.PATH_MODELS, model_name)
+                )
+                print(loaded_model)
+                print(type(loaded_model))
+                print(dir(loaded_model))
+                self.__models[model_name[:-4]] = loaded_model
+            for model in self.__models.values():
+                if model.fiited:
+                    self.__names_fitted_models.append(model.user_model_name)
 
     def get_available_model_types(self, show: bool = False):
         """
@@ -68,7 +90,10 @@ class AllModels(object):
             return self.__available_model_types
 
     def get_models(
-        self, only_fitted: bool = False, name_models: str | None = None
+        self,
+        only_fitted: bool = False,
+        all_params: bool = False,
+        name_models: str | None = None,
     ):
         """
         Getting all user models
@@ -77,6 +102,9 @@ class AllModels(object):
         ----------
         only_fitted : bool, optional
             True if you want to get only fitted model(s), else False,
+            by default False
+        all_params : bool, optional
+            True if you want to get all params, else False,
             by default False
         name_models : str | None, optional
             User's model name of only ONE particular model you want to get,
@@ -115,7 +143,7 @@ class AllModels(object):
             {
                 "user_model_name": user_model_name,
                 "type_model": self.__models[user_model_name].type_model,
-                "params": self.get_params(user_model_name),
+                "params": self.get_params(user_model_name, all_params),
                 "fitted": self.__models[user_model_name].fiited,
             }
             for user_model_name in name_models
@@ -164,6 +192,12 @@ class AllModels(object):
             user_model_name,
             params=params,
         )
+        print("мой вывод", type(self.__models[user_model_name]))
+        joblib.dump(
+            self.__models[user_model_name],
+            self.PATH_MODELS + f"/{user_model_name}.pkl",
+        )
+
         return {
             "user_model_name": user_model_name,
             "type_model": type_model,
@@ -193,6 +227,10 @@ class AllModels(object):
             self.__models[user_model_name].fit(X, y)
             self.__names_fitted_models.append(user_model_name)
             self.fitted = True
+            joblib.dump(
+                self.__models[user_model_name],
+                self.PATH_MODELS + f"/{user_model_name}.pkl",
+            )
         except KeyError:
             raise NameKeyError("There is no model with this name")
 
@@ -262,6 +300,7 @@ class AllModels(object):
             del self.__models[user_model_name]
             if user_model_name in self.__names_fitted_models:
                 self.__names_fitted_models.remove(user_model_name)
+            os.remove(os.path.join(self.PATH_MODELS, f"{user_model_name}.pkl"))
         except KeyError:
             raise NameKeyError("There is no model with this name")
 
