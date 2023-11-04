@@ -1,11 +1,10 @@
+import os
 from typing import Dict, List
 
+import joblib
 import numpy as np
 from catboost import CatBoostClassifier
 from sklearn.ensemble import RandomForestClassifier
-import os
-
-import joblib
 
 
 class NameKeyError(KeyError):
@@ -58,9 +57,6 @@ class AllModels(object):
                 loaded_model = joblib.load(
                     os.path.join(self.PATH_MODELS, model_name)
                 )
-                print(loaded_model)
-                print(type(loaded_model))
-                print(dir(loaded_model))
                 self.__models[model_name[:-4]] = loaded_model
             for model in self.__models.values():
                 if model.fiited:
@@ -192,7 +188,6 @@ class AllModels(object):
             user_model_name,
             params=params,
         )
-        print("мой вывод", type(self.__models[user_model_name]))
         joblib.dump(
             self.__models[user_model_name],
             self.PATH_MODELS + f"/{user_model_name}.pkl",
