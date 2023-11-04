@@ -6,28 +6,15 @@ import numpy as np
 from catboost import CatBoostClassifier
 from sklearn.ensemble import RandomForestClassifier
 
-
-class NameKeyError(KeyError):
-    def __init__(self, text):
-        self.txt = text
-
-
-class MyAlreadyExistsError(Exception):
-    def __init__(self, text):
-        self.txt = text
+from model_training.exceptions import (
+    AlreadyExistsError,
+    InvalidData,
+    NameKeyError,
+    ParamsTypeError,
+)
 
 
-class ParamsTypeError(TypeError):
-    def __init__(self, text):
-        self.txt = text
-
-
-class InvalidData(Exception):
-    def __init__(self, text):
-        self.txt = text
-
-
-class AllModels(object):
+class model_factory(object):
     """
     Class for working with models
 
@@ -35,7 +22,7 @@ class AllModels(object):
 
     def __new__(cls):
         if not hasattr(cls, "instance"):
-            cls.instance = super(AllModels, cls).__new__(cls)
+            cls.instance = super(model_factory, cls).__new__(cls)
         return cls.instance
 
     def __init__(self):
@@ -168,14 +155,14 @@ class AllModels(object):
 
         Raises
         ------
-        MyAlreadyExistsError
+        AlreadyExistsError
             Occurs if a model with same name already exists
 
         NameKeyError
             Occurs if there is an error in model type or model name
         """
         if user_model_name in self.__models.keys():
-            raise MyAlreadyExistsError(
+            raise AlreadyExistsError(
                 "A model with the same name already exists"
             )
         if type_model not in self.__available_model_types.keys():

@@ -5,7 +5,7 @@ import numpy as np
 
 import models_fitting_pb2
 import models_fitting_pb2_grpc
-from mlops_hse.two_classes import AllModels
+from model_training.model_training import model_factory
 
 
 class Greeter(models_fitting_pb2_grpc.ModelTransferServicer):
@@ -70,5 +70,5 @@ def serve():
     server.wait_for_termination()
 
 
-allm = AllModels()
+allm = model_factory()
 serve()
