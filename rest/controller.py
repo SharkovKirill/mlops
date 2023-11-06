@@ -12,11 +12,10 @@ from model_training.exceptions import (
     NameKeyError,
     ParamsTypeError,
 )
-
-from model_training.model_training import model_factory
+from model_training.model_training import ModelFactory
 
 app = FastAPI(title="MLApp")
-allmodels = model_factory()
+allmodels = ModelFactory()
 
 
 class ClassType(Enum):
@@ -74,11 +73,11 @@ async def init_models(
             type_model, user_model_name, params=params
         )
     except AlreadyExistsError as e:
-        raise HTTPException(status_code=404, detail=e.txt)
+        raise HTTPException(status_code=400, detail=e.txt)
     except NameKeyError as e:
         raise HTTPException(status_code=404, detail=e.txt)
     except ParamsTypeError as e:
-        raise HTTPException(status_code=404, detail=e.txt)
+        raise HTTPException(status_code=400, detail=e.txt)
 
 
 @app.put("/model_fit/{user_model_name}", status_code=200)
@@ -94,7 +93,7 @@ async def model_fit(user_model_name: str, data: Data) -> Model:
     except NameKeyError as e:
         raise HTTPException(status_code=404, detail=e.txt)
     except InvalidData as e:
-        raise HTTPException(status_code=404, detail=e.txt)
+        raise HTTPException(status_code=400, detail=e.txt)
 
 
 @app.put("/model_predict/{user_model_name}", status_code=200)
@@ -112,10 +111,10 @@ async def model_predict(user_model_name: str, data: Data) -> Dict[str, List]:
     except NameKeyError as e:
         raise HTTPException(status_code=404, detail=e.txt)
     except InvalidData as e:
-        raise HTTPException(status_code=404, detail=e.txt)
-    except ValueError as e:
+        raise HTTPException(status_code=400, detail=e.txt)
+    except ValueError:
         raise HTTPException(
-            status_code=404, detail="Incorrect data for prediction"
+            status_code=400, detail="Incorrect data for prediction"
         )
 
 

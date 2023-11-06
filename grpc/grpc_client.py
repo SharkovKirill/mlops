@@ -1,8 +1,10 @@
-import grpc
-from typing import Dict, List
+from typing import Dict
+
 import models_fitting_pb2
 import models_fitting_pb2_grpc
 import numpy as np
+
+import grpc
 
 
 def get_model_types(stub, show: bool = True):

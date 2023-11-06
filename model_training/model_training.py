@@ -14,7 +14,7 @@ from model_training.exceptions import (
 )
 
 
-class model_factory(object):
+class ModelFactory(object):
     """
     Class for working with models
 
@@ -22,7 +22,7 @@ class model_factory(object):
 
     def __new__(cls):
         if not hasattr(cls, "instance"):
-            cls.instance = super(model_factory, cls).__new__(cls)
+            cls.instance = super(ModelFactory, cls).__new__(cls)
         return cls.instance
 
     def __init__(self):
@@ -105,6 +105,7 @@ class model_factory(object):
             Occurs if the model with the same name was not found
             or was not fitted
         """
+        self.__init__()
         if name_models is not None and only_fitted:
             if name_models in self.__names_fitted_models:
                 name_models = [name_models]
@@ -161,6 +162,7 @@ class model_factory(object):
         NameKeyError
             Occurs if there is an error in model type or model name
         """
+        self.__init__()
         if user_model_name in self.__models.keys():
             raise AlreadyExistsError(
                 "A model with the same name already exists"
@@ -206,6 +208,7 @@ class model_factory(object):
             Occurs if a model with the same name was not found
         """
         try:
+            self.__init__()
             self.__models[user_model_name].fit(X, y)
             self.__names_fitted_models.append(user_model_name)
             self.fitted = True
@@ -238,6 +241,7 @@ class model_factory(object):
             Occurs if a model with the same name was not found
             or was not fitted
         """
+        self.__init__()
         if user_model_name in self.__names_fitted_models:
             return self.__models[user_model_name].predict(X)
         else:
@@ -262,6 +266,7 @@ class model_factory(object):
         dict
             Dict with params
         """
+        self.__init__()
         return self.__models[user_model_name].get_params(all)
 
     def delete_model(self, user_model_name: str):
@@ -279,6 +284,7 @@ class model_factory(object):
             Occurs if there is no model with same name
         """
         try:
+            self.__init__()
             del self.__models[user_model_name]
             if user_model_name in self.__names_fitted_models:
                 self.__names_fitted_models.remove(user_model_name)

@@ -1,11 +1,11 @@
 from concurrent import futures
 
-import grpc
-import numpy as np
-
 import models_fitting_pb2
 import models_fitting_pb2_grpc
-from model_training.model_training import model_factory
+import numpy as np
+
+import grpc
+from model_training.model_training import ModelFactory
 
 
 class Greeter(models_fitting_pb2_grpc.ModelTransferServicer):
@@ -70,5 +70,5 @@ def serve():
     server.wait_for_termination()
 
 
-allm = model_factory()
+allm = ModelFactory()
 serve()
