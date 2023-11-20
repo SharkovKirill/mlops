@@ -16,3 +16,8 @@ class ParamsTypeError(TypeError):
 class InvalidData(Exception):
     def __init__(self, text):
         self.txt = text
+
+
+class ConnectionError(Exception):
+    def __init__(self, text):
+        self.txt = text

@@ -1,17 +1,105 @@
 import os
+import tempfile
 from typing import Dict, List
 
+import boto3
 import joblib
 import numpy as np
+from botocore.client import Config
 from catboost import CatBoostClassifier
 from sklearn.ensemble import RandomForestClassifier
 
 from model_training.exceptions import (
     AlreadyExistsError,
+    ConnectionError,
     InvalidData,
     NameKeyError,
     ParamsTypeError,
 )
+
+ACCESS_KEY = "user_login"
+SECRET_KEY = "user_password"
+ENDPOINT_URL = "http://127.0.0.1:9000"
+MODELs_BUCKET_NAME = "models"
+
+
+class Storage:
+    """
+    Minio controller
+
+    Raises
+    ------
+    ConnectionError
+        Occurs when you can't connect to minio
+    """
+
+    @staticmethod
+    def get_s3_client():
+        try:
+            s3_client = boto3.client(
+                "s3",
+                endpoint_url=ENDPOINT_URL,
+                aws_access_key_id=ACCESS_KEY,
+                aws_secret_access_key=SECRET_KEY,
+                config=Config(signature_version="s3v4"),
+                region_name="us-east-1",
+            )
+        except:
+            raise ConnectionError("Connection error")
+        return s3_client
+
+    @staticmethod
+    def create_bucket_if_not_exists(s3_client):
+        if MODELs_BUCKET_NAME not in [
+            b["Name"] for b in s3_client.list_buckets()["Buckets"]
+        ]:
+            s3_client.create_bucket(
+                ACL="public-read-write",
+                Bucket=MODELs_BUCKET_NAME,
+                CreateBucketConfiguration={"LocationConstraint": "us-east-1"},
+            )
+
+    @staticmethod
+    def model_dump_s3(model, user_model_name: str):
+        s3_client = Storage.get_s3_client()
+        Storage.create_bucket_if_not_exists(s3_client)
+        with tempfile.TemporaryFile() as fp:
+            joblib.dump(model, fp)
+            fp.seek(0)
+            s3_client.put_object(
+                Body=fp.read(), Bucket=MODELs_BUCKET_NAME, Key=f"/{user_model_name}.pkl"
+            )
+
+    @staticmethod
+    def reload_models_from_s3(bucket_name: str = MODELs_BUCKET_NAME):
+        s3_client = Storage.get_s3_client()
+        Storage.create_bucket_if_not_exists(s3_client)
+        try:
+            model_dict = dict()
+            model_keys = [
+                obj["Key"]
+                for obj in s3_client.list_objects_v2(Bucket=bucket_name)[
+                    "Contents"
+                ]
+            ]
+
+            if len(model_keys) != 0:
+                for key in model_keys:
+                    with tempfile.TemporaryFile() as fp:
+                        s3_client.download_fileobj(
+                            Fileobj=fp, Bucket=bucket_name, Key=key
+                        )
+                        fp.seek(0)
+                        model_dict[key[:-4]] = joblib.load(fp)
+            return model_dict
+        # except Exception as e:
+        #     raise logging.exception(e)
+        except KeyError:
+            return {}
+
+    def del_model_s3(user_model_name: str):
+        s3_client = Storage.get_s3_client()
+        s3_client.delete_object(Bucket=MODELs_BUCKET_NAME, Key=user_model_name + ".pkl")
 
 
 class ModelFactory(object):
@@ -31,23 +119,30 @@ class ModelFactory(object):
             "rf": RandomForestClassifier,
         }
         self.__names_fitted_models: List[str] = []
-        self.__models: Dict[Model] = {}
+        self.__models: Dict[Model] = Storage.reload_models_from_s3()
 
-        self.PATH = os.getcwd()
-        self.PATH_MODELS = os.path.join(self.PATH, "models")
-
-        if not os.path.isdir(self.PATH_MODELS):
-            os.mkdir(self.PATH_MODELS)
-
-        if len(os.listdir(self.PATH_MODELS)) != 0:
-            for model_name in os.listdir(self.PATH_MODELS):
-                loaded_model = joblib.load(
-                    os.path.join(self.PATH_MODELS, model_name)
-                )
-                self.__models[model_name[:-4]] = loaded_model
+        if len(self.__models.keys()) != 0:
             for model in self.__models.values():
                 if model.fiited:
                     self.__names_fitted_models.append(model.user_model_name)
+        # self.__names_fitted_models: List[str] = []
+        # self.__models: Dict[Model] = {}
+
+        # self.PATH = os.getcwd()
+        # self.PATH_MODELS = os.path.join(self.PATH, "models")
+
+        # if not os.path.isdir(self.PATH_MODELS):
+        #     os.mkdir(self.PATH_MODELS)
+
+        # if len(os.listdir(self.PATH_MODELS)) != 0:
+        #     for model_name in os.listdir(self.PATH_MODELS):
+        #         loaded_model = joblib.load(
+        #             os.path.join(self.PATH_MODELS, model_name)
+        #         )
+        #         self.__models[model_name[:-4]] = loaded_model
+        #     for model in self.__models.values():
+        #         if model.fiited:
+        #             self.__names_fitted_models.append(model.user_model_name)
 
     def get_available_model_types(self, show: bool = False):
         """
@@ -177,11 +272,11 @@ class ModelFactory(object):
             user_model_name,
             params=params,
         )
-        joblib.dump(
-            self.__models[user_model_name],
-            self.PATH_MODELS + f"/{user_model_name}.pkl",
-        )
-
+        # joblib.dump(
+        #     self.__models[user_model_name],
+        #     self.PATH_MODELS + f"/{user_model_name}.pkl",
+        # )
+        Storage.model_dump_s3(self.__models[user_model_name], user_model_name)
         return {
             "user_model_name": user_model_name,
             "type_model": type_model,
@@ -212,10 +307,13 @@ class ModelFactory(object):
             self.__models[user_model_name].fit(X, y)
             self.__names_fitted_models.append(user_model_name)
             self.fitted = True
-            joblib.dump(
-                self.__models[user_model_name],
-                self.PATH_MODELS + f"/{user_model_name}.pkl",
+            Storage.model_dump_s3(
+                self.__models[user_model_name], user_model_name
             )
+            # joblib.dump(
+            #     self.__models[user_model_name],
+            #     self.PATH_MODELS + f"/{user_model_name}.pkl",
+            # )
         except KeyError:
             raise NameKeyError("There is no model with this name")
 
@@ -288,7 +386,8 @@ class ModelFactory(object):
             del self.__models[user_model_name]
             if user_model_name in self.__names_fitted_models:
                 self.__names_fitted_models.remove(user_model_name)
-            os.remove(os.path.join(self.PATH_MODELS, f"{user_model_name}.pkl"))
+            # os.remove(os.path.join(self.PATH_MODELS, f"{user_model_name}.pkl"))
+            Storage.del_model_s3(user_model_name)
         except KeyError:
             raise NameKeyError("There is no model with this name")
 
