@@ -130,5 +130,9 @@ async def delete_model(user_model_name: str) -> List[Model]:
 def start():
     """Launched with `poetry run start` at root level"""
     uvicorn.run(
-        "rest.controller:app", host="127.0.0.1", port=8005, reload=True
+        "rest.controller:app",
+        host="0.0.0.0",
+        port=8005,
+        reload=False
+        # "rest.controller:app", host="127.0.0.1", port=8005, reload=True
     )

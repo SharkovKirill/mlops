@@ -9,18 +9,15 @@ from botocore.client import Config
 from catboost import CatBoostClassifier
 from sklearn.ensemble import RandomForestClassifier
 
-from model_training.exceptions import (
-    AlreadyExistsError,
-    ConnectionError,
-    InvalidData,
-    NameKeyError,
-    ParamsTypeError,
-)
+from model_training.exceptions import (AlreadyExistsError, ConnectionError,
+                                       InvalidData, NameKeyError,
+                                       ParamsTypeError)
 
 ACCESS_KEY = "user_login"
 SECRET_KEY = "user_password"
-ENDPOINT_URL = "http://127.0.0.1:9000"
-MODELs_BUCKET_NAME = "models"
+# ENDPOINT_URL = "http://127.0.0.1:9000"
+ENDPOINT_URL = "http://minio:9000"
+MODELS_BUCKET_NAME = "models"
 
 
 class Storage:
@@ -50,12 +47,12 @@ class Storage:
 
     @staticmethod
     def create_bucket_if_not_exists(s3_client):
-        if MODELs_BUCKET_NAME not in [
+        if MODELS_BUCKET_NAME not in [
             b["Name"] for b in s3_client.list_buckets()["Buckets"]
         ]:
             s3_client.create_bucket(
                 ACL="public-read-write",
-                Bucket=MODELs_BUCKET_NAME,
+                Bucket=MODELS_BUCKET_NAME,
                 CreateBucketConfiguration={"LocationConstraint": "us-east-1"},
             )
 
@@ -67,11 +64,13 @@ class Storage:
             joblib.dump(model, fp)
             fp.seek(0)
             s3_client.put_object(
-                Body=fp.read(), Bucket=MODELs_BUCKET_NAME, Key=f"/{user_model_name}.pkl"
+                Body=fp.read(),
+                Bucket=MODELS_BUCKET_NAME,
+                Key=f"/{user_model_name}.pkl",
             )
 
     @staticmethod
-    def reload_models_from_s3(bucket_name: str = MODELs_BUCKET_NAME):
+    def reload_models_from_s3(bucket_name: str = MODELS_BUCKET_NAME):
         s3_client = Storage.get_s3_client()
         Storage.create_bucket_if_not_exists(s3_client)
         try:
@@ -99,7 +98,9 @@ class Storage:
 
     def del_model_s3(user_model_name: str):
         s3_client = Storage.get_s3_client()
-        s3_client.delete_object(Bucket=MODELs_BUCKET_NAME, Key=user_model_name + ".pkl")
+        s3_client.delete_object(
+            Bucket=MODELS_BUCKET_NAME, Key=user_model_name + ".pkl"
+        )
 
 
 class ModelFactory(object):
@@ -119,8 +120,11 @@ class ModelFactory(object):
             "rf": RandomForestClassifier,
         }
         self.__names_fitted_models: List[str] = []
-        self.__models: Dict[Model] = Storage.reload_models_from_s3()
+        self.__models: Dict[Model] = []
 
+    def reload_models(self):
+        self.__names_fitted_models: List[str] = []
+        self.__models: Dict[Model] = Storage.reload_models_from_s3()
         if len(self.__models.keys()) != 0:
             for model in self.__models.values():
                 if model.fiited:
@@ -200,7 +204,7 @@ class ModelFactory(object):
             Occurs if the model with the same name was not found
             or was not fitted
         """
-        self.__init__()
+        self.reload_models()
         if name_models is not None and only_fitted:
             if name_models in self.__names_fitted_models:
                 name_models = [name_models]
@@ -257,7 +261,7 @@ class ModelFactory(object):
         NameKeyError
             Occurs if there is an error in model type or model name
         """
-        self.__init__()
+        self.reload_models()
         if user_model_name in self.__models.keys():
             raise AlreadyExistsError(
                 "A model with the same name already exists"
@@ -303,7 +307,7 @@ class ModelFactory(object):
             Occurs if a model with the same name was not found
         """
         try:
-            self.__init__()
+            self.reload_models()
             self.__models[user_model_name].fit(X, y)
             self.__names_fitted_models.append(user_model_name)
             self.fitted = True
@@ -339,7 +343,7 @@ class ModelFactory(object):
             Occurs if a model with the same name was not found
             or was not fitted
         """
-        self.__init__()
+        self.reload_models()
         if user_model_name in self.__names_fitted_models:
             return self.__models[user_model_name].predict(X)
         else:
@@ -364,7 +368,7 @@ class ModelFactory(object):
         dict
             Dict with params
         """
-        self.__init__()
+        self.reload_models()
         return self.__models[user_model_name].get_params(all)
 
     def delete_model(self, user_model_name: str):
@@ -382,7 +386,7 @@ class ModelFactory(object):
             Occurs if there is no model with same name
         """
         try:
-            self.__init__()
+            self.reload_models()
             del self.__models[user_model_name]
             if user_model_name in self.__names_fitted_models:
                 self.__names_fitted_models.remove(user_model_name)

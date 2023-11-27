@@ -7,7 +7,6 @@ import streamlit as st
 
 def streamlit_app():
     st.title("Ml App")
-    # st.sidebar.title("What to do")
     app_mode = st.sidebar.selectbox(
         "What to do",
         [
@@ -20,11 +19,11 @@ def streamlit_app():
 
     def get_available_model_types():
         return requests.get(
-            "http://localhost:8005/get_available_model_types"
+            "http://0.0.0.0:8005/get_available_model_types"
         ).json()
 
     def get_models():
-        return requests.get("http://localhost:8005/get_models").json()
+        return requests.get("http://0.0.0.0:8005/get_models").json()
 
     if app_mode == "Get available model types":
         res = get_available_model_types()
@@ -47,7 +46,7 @@ def streamlit_app():
         # params = json.loads('{"random_state": 43}')
         if st.button("Init new model"):
             requests.post(
-                f"http://localhost:8005/init_new_model?type_model={type_model}&user_model_name={user_model_name}",
+                f"http://0.0.0.0:8005/init_new_model?type_model={type_model}&user_model_name={user_model_name}",
                 json=dict(params),
             )
             st.write(type_model, user_model_name)
@@ -73,7 +72,7 @@ def streamlit_app():
 
             print(json_data)
             result = requests.put(
-                f"http://localhost:8005/model_fit/{model_name}", json=data
+                f"http://0.0.0.0:8005/model_fit/{model_name}", json=data
             ).status_code
             print(result)
             if result == 200:
@@ -104,7 +103,10 @@ def streamlit_app():
             data["y"] = train_values
             json_data = json.dumps(data)
             result = requests.put(
-                f"http://localhost:8005/model_predict/{model_name}", json=data
+                f"http://0.0.0.0:8005/model_predict/{model_name}", json=data
             ).json()
             df["preds"] = result["preds"]
             st.table(df)
+
+
+streamlit_app()

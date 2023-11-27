@@ -14,6 +14,7 @@ uvicorn = "^0.23.2"
 gunicorn = "^21.2.0"
 streamlit = "^1.28.1"
 boto3 = "^1.29.3"
+clearml = "^1.13.2"
 
 
 [tool.poetry.group.dev.dependencies]
