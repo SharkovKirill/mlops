@@ -7,17 +7,22 @@ import joblib
 import numpy as np
 from botocore.client import Config
 from catboost import CatBoostClassifier
+from clearml import Task, TaskTypes, InputModel, OutputModel
 from sklearn.ensemble import RandomForestClassifier
 
-from model_training.exceptions import (AlreadyExistsError, ConnectionError,
-                                       InvalidData, NameKeyError,
-                                       ParamsTypeError)
+from model_training.exceptions import (
+    AlreadyExistsError,
+    ConnectionError,
+    InvalidData,
+    NameKeyError,
+    ParamsTypeError,
+)
 
-ACCESS_KEY = "user_login"
-SECRET_KEY = "user_password"
-# ENDPOINT_URL = "http://127.0.0.1:9000"
-ENDPOINT_URL = "http://minio:9000"
+MINIO_USER = os.environ.get("MINIO_USER", "user_login")
+MINIO_PASSWORD = os.environ.get("MINIO_PASSWORD", "user_password")
+MINIO_URL = os.environ.get("MINIO_URL", "http://localhost:9000")
 MODELS_BUCKET_NAME = "models"
+CLEARML_PROJECT_NAME = "nazvanie_projecta"
 
 
 class Storage:
@@ -35,9 +40,9 @@ class Storage:
         try:
             s3_client = boto3.client(
                 "s3",
-                endpoint_url=ENDPOINT_URL,
-                aws_access_key_id=ACCESS_KEY,
-                aws_secret_access_key=SECRET_KEY,
+                endpoint_url=MINIO_URL,
+                aws_access_key_id=MINIO_USER,
+                aws_secret_access_key=MINIO_PASSWORD,
                 config=Config(signature_version="s3v4"),
                 region_name="us-east-1",
             )
@@ -91,8 +96,6 @@ class Storage:
                         fp.seek(0)
                         model_dict[key[:-4]] = joblib.load(fp)
             return model_dict
-        # except Exception as e:
-        #     raise logging.exception(e)
         except KeyError:
             return {}
 
@@ -310,14 +313,9 @@ class ModelFactory(object):
             self.reload_models()
             self.__models[user_model_name].fit(X, y)
             self.__names_fitted_models.append(user_model_name)
-            self.fitted = True
             Storage.model_dump_s3(
                 self.__models[user_model_name], user_model_name
             )
-            # joblib.dump(
-            #     self.__models[user_model_name],
-            #     self.PATH_MODELS + f"/{user_model_name}.pkl",
-            # )
         except KeyError:
             raise NameKeyError("There is no model with this name")
 
@@ -345,7 +343,8 @@ class ModelFactory(object):
         """
         self.reload_models()
         if user_model_name in self.__names_fitted_models:
-            return self.__models[user_model_name].predict(X)
+            preds = self.__models[user_model_name].predict(X)
+            return preds
         else:
             raise NameKeyError(
                 "A model with the same name was not found or was not fitted"
@@ -461,9 +460,20 @@ class Model:
             Error in data
         """
         try:
-            self.base_model.fit(X=X, y=y)
+            task = Task.init(
+                project_name=CLEARML_PROJECT_NAME,
+                task_name=self.user_model_name,
+                tags=[self.type_model, "fit"],
+            )
+            task.set_parameters(self.params)
+            model = self.base_model.__class__(**self.params)
+            model.fit(X=X, y=y)
+            joblib.dump(model, f"{self.user_model_name}.pkl")
             self.fiited = True
+            self.base_model = model
+            task.close()
         except:
+            task.close()
             raise InvalidData("Incorrect training data")
 
     def predict(self, X: np.array):
@@ -481,8 +491,25 @@ class Model:
             Error in data
         """
         try:
-            return self.base_model.predict(X)
+            task = Task.init(
+                project_name=CLEARML_PROJECT_NAME,
+                task_name=self.user_model_name,
+                tags=[self.type_model, "predict"],
+                task_type=TaskTypes.inference,
+            )
+            input_model = InputModel(
+                project=CLEARML_PROJECT_NAME,
+                name=self.user_model_name + " - " + self.user_model_name,
+            )
+            task.connect(input_model)
+            model = self.base_model
+            preds = model.predict(X)
+            task.set_parameters(self.params)
+            self.base_model = model
+            task.close()
+            return preds
         except:
+            task.close()
             raise InvalidData("Incorrect data for prediction")
 
     def get_params(self, all: bool = False) -> dict:

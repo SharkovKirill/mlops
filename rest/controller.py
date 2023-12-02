@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Dict, List, Optional
-
+import os
 import numpy as np
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -88,7 +88,7 @@ async def model_fit(user_model_name: str, data: Data) -> Model:
         y = np.array(data.y)
         for feature_id in range(len(list(data.X.keys()))):
             X[:, feature_id] = list_values[feature_id]
-            allmodels.model_fit(X, y, user_model_name)
+        allmodels.model_fit(X, y, user_model_name)
         return allmodels.get_models(name_models=user_model_name)[0]
     except NameKeyError as e:
         raise HTTPException(status_code=404, detail=e.txt)
@@ -129,10 +129,15 @@ async def delete_model(user_model_name: str) -> List[Model]:
 
 def start():
     """Launched with `poetry run start` at root level"""
-    uvicorn.run(
-        "rest.controller:app",
-        host="0.0.0.0",
-        port=8005,
-        reload=False
-        # "rest.controller:app", host="127.0.0.1", port=8005, reload=True
-    )
+    print(os.environ["HOME"])
+    if os.environ.get("DOCKER_MODE") == "1":
+        uvicorn.run(
+            "rest.controller:app",
+            host="0.0.0.0",
+            port=8005,
+            reload=False
+        )
+    else:
+        uvicorn.run(
+            "rest.controller:app", host="127.0.0.1", port=8005, reload=True
+        )
