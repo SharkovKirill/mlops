@@ -30,7 +30,7 @@ services:
       - backend
       - frontend
   app:
-    image: mlops_hse:0.1.0
+    image: kilaef/mlops_hse:0.1.0
     ports:
       - "8005:8005"
     depends_on:
