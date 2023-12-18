@@ -20,7 +20,7 @@ MINIO_URL = os.environ.get("MINIO_URL", "http://localhost:9000")
 
 Далее при активированном окружении:
 >**для запуска с REST**: 
-`poetry run start`
+`poetry run start_fast_api`
 **для запуска с gRPC**: 
 `poetry run python grpc/grpc_server.py`\
 `poetry run python grpc/grpc_client.py `
