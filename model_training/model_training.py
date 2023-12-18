@@ -7,16 +7,12 @@ import joblib
 import numpy as np
 from botocore.client import Config
 from catboost import CatBoostClassifier
-from clearml import Task, TaskTypes, InputModel, OutputModel
+from clearml import InputModel, OutputModel, Task, TaskTypes
 from sklearn.ensemble import RandomForestClassifier
 
-from model_training.exceptions import (
-    AlreadyExistsError,
-    ConnectionError,
-    InvalidData,
-    NameKeyError,
-    ParamsTypeError,
-)
+from model_training.exceptions import (AlreadyExistsError, ConnectionError,
+                                       InvalidData, NameKeyError,
+                                       ParamsTypeError)
 
 MINIO_USER = os.environ.get("MINIO_USER", "user_login")
 MINIO_PASSWORD = os.environ.get("MINIO_PASSWORD", "user_password")
@@ -95,6 +91,7 @@ class Storage:
                         )
                         fp.seek(0)
                         model_dict[key[:-4]] = joblib.load(fp)
+            print(model_dict)
             return model_dict
         except KeyError:
             return {}
